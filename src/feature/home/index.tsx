@@ -15,11 +15,10 @@ import {
 } from "@/components/ui/select";
 import { useChessMain } from "@/hooks/chess/useChessMain";
 import { MatchFound } from "@/types/matchmaking";
+import { formatSOL } from "@/lib/solana/config";
 import { CheckIcon, CopyIcon } from "lucide-react";
 import { useState } from "react";
 import { Chessboard } from "react-chessboard";
-import { formatEther } from "viem";
-import { useSwitchChain } from "wagmi";
 import CapturedPieces from "../../components/captured-pieces";
 import { MatchmakingScreen } from "../../components/matchmaking-screen";
 
@@ -79,7 +78,6 @@ export default function ChessMultisynqApp() {
     multisynqView,
     rematchCreating,
 
-    isWrongNetwork,
     address,
     gameInfo,
     gameId,
@@ -102,7 +100,6 @@ export default function ChessMultisynqApp() {
   } = chess;
 
   const [copied, setCopied] = useState(false);
-  const { switchChain } = useSwitchChain();
 
   const handleMenuChange = (newMenu: "create" | "join" | "matchmaking") => {
     if (newMenu === menuActive) return;
@@ -159,7 +156,7 @@ export default function ChessMultisynqApp() {
             </h1>
             <p className="text-white/80 text-base md:text-xl mt-3 mx-auto md:max-w-[80%]">
               {!chess.isConnected
-                ? "SynqMate is a chess game on Monad that allows you to find a match, bet and win crypto while playing chess."
+                ? "SynqMate is a chess game on Solana that allows you to find a match, bet and win crypto while playing chess."
                 : menuActive === "create"
                 ? "Create a game and invite your friends to play."
                 : menuActive === "join"
@@ -326,22 +323,14 @@ export default function ChessMultisynqApp() {
 
                         <button
                           onClick={() => {
-                            if (chess.isConnected && chess.isWrongNetwork) {
-                              try {
-                                switchChain({ chainId: 10143 });
-                              } catch {}
-                            } else {
-                              chess.handleCreateRoom();
-                            }
+                            chess.handleCreateRoom();
                           }}
                           disabled={
                             chess.isCreatingRoom || !chess.multisynqReady
                           }
                           className="w-full bg-gradient-to-r from-[#836EF9] to-[#836EF9]/80 hover:from-[#836EF9]/80 hover:to-[#836EF9] disabled:from-[rgba(255,255,255,0.07)] disabled:to-[rgba(255,255,255,0.07)] text-white font-medium py-4 px-6 rounded-xl text-sm md:text-lg transition-all"
                         >
-                          {chess.isWrongNetwork
-                            ? "Switch to Monad & Create"
-                            : chess.isCreatingRoom
+                          {chess.isCreatingRoom
                             ? "Creating..."
                             : !chess.multisynqReady
                             ? "Loading Multisynq..."
@@ -373,16 +362,11 @@ export default function ChessMultisynqApp() {
                           disabled={
                             !chess.roomInput.trim() ||
                             !chess.multisynqReady ||
-                            chess.isPending ||
-                            chess.isWrongNetwork
+                            chess.isPending
                           }
                           className="w-full bg-gradient-to-r from-[#836EF9] to-[#836EF9]/80 hover:from-[#836EF9]/80 hover:to-[#836EF9] disabled:from-[#252525] disabled:to-[#252525] text-white font-medium py-4 px-6 rounded-xl text-sm md:text-lg transition-all"
                         >
-                          {chess.isWrongNetwork
-                            ? "Switch to Monad & Join"
-                            : chess.isPending
-                            ? "Processing..."
-                            : "Join Game"}
+                          {chess.isPending ? "Processing..." : "Join Game"}
                         </button>
                       </div>
                     </div>
@@ -539,9 +523,9 @@ export default function ChessMultisynqApp() {
                                   </span>
                                   <span className="font-medium text-white text-base">
                                     {gameInfo?.betAmount
-                                      ? formatEther(gameInfo.betAmount)
+                                      ? formatSOL(gameInfo.betAmount)
                                       : betAmount}{" "}
-                                    MON
+                                    SOL
                                   </span>
                                 </div>
                                 <div className="flex justify-between text-sm md:text-base text-white md:mb-6 mb-3">
@@ -550,13 +534,13 @@ export default function ChessMultisynqApp() {
                                   </span>
                                   <span className="font-semibold text-green-400">
                                     {gameInfo?.betAmount
-                                      ? formatEther(
+                                      ? formatSOL(
                                           gameInfo.betAmount * BigInt(2)
                                         )
                                       : (
                                           parseFloat(betAmount) * 2
                                         ).toString()}{" "}
-                                    MON
+                                    SOL
                                   </span>
                                 </div>
                               </div>
@@ -635,16 +619,6 @@ export default function ChessMultisynqApp() {
                                 <div className="space-y-2">
                                   <button
                                     onClick={async () => {
-                                      if (isWrongNetwork) {
-                                        try {
-                                          await switchChain({ chainId: 10143 });
-
-                                          return;
-                                        } catch {
-                                          return;
-                                        }
-                                      }
-
                                       if (
                                         (!gameInfo ||
                                           gameInfo.betAmount === BigInt(0)) &&
@@ -707,8 +681,6 @@ export default function ChessMultisynqApp() {
                                           ? "Signing..."
                                           : "Confirming..."}
                                       </>
-                                    ) : isWrongNetwork ? (
-                                      "Switch to Monad & Pay"
                                     ) : (
                                       "Bet & Play"
                                     )}
@@ -730,7 +702,7 @@ export default function ChessMultisynqApp() {
                                       ) : cancelState.isError ? (
                                         <button
                                           onClick={() =>
-                                            cancelBettingGame(gameId as bigint)
+                                            gameId && cancelBettingGame(gameId)
                                           }
                                           className="w-full mt-5 px-6 py-4 bg-[#836EF9] disabled:bg-[#404040] text-white rounded-lg font-medium text-sm md:text-lg transition-colors flex items-center justify-center"
                                         >
@@ -744,7 +716,7 @@ export default function ChessMultisynqApp() {
                                       ) : (
                                         <button
                                           onClick={() =>
-                                            cancelBettingGame(gameId as bigint)
+                                            gameId && cancelBettingGame(gameId)
                                           }
                                           className="w-full px-6 py-4 bg-[#836EF9] hover:bg-[#937EF9] text-white rounded-lg font-medium text-sm md:text-lg transition-colors"
                                         >
@@ -829,10 +801,10 @@ export default function ChessMultisynqApp() {
                                       Prize Pool:
                                     </h4>
                                     <span className="text-green-400 font-bold text-sm md:text-base">
-                                      {formatEther(
+                                      {formatSOL(
                                         gameInfo.betAmount * BigInt(2)
                                       )}{" "}
-                                      MON
+                                      SOL
                                     </span>
                                   </div>
 
@@ -973,11 +945,11 @@ export default function ChessMultisynqApp() {
                                       ) : (
                                         `Claim  ${
                                           gameInfo?.betAmount
-                                            ? formatEther(
+                                            ? formatSOL(
                                                 gameInfo.betAmount * BigInt(2)
                                               )
                                             : "0"
-                                        } MON`
+                                        } SOL`
                                       )}
                                     </button>
                                   )}
@@ -1036,8 +1008,8 @@ export default function ChessMultisynqApp() {
                                       Your opponent offers you a rematch for{" "}
                                       <span className="text-white font-medium">
                                         {rematchInvitation?.betAmount
-                                          ? `${rematchInvitation?.betAmount} MON`
-                                          : `${betAmount} MON`}
+                                          ? `${rematchInvitation?.betAmount} SOL`
+                                          : `${betAmount} SOL`}
                                       </span>
                                     </p>
                                     <div className="grid grid-cols-2 gap-3">
@@ -1262,7 +1234,7 @@ export default function ChessMultisynqApp() {
                         {getAvailableAmount() > "0"
                           ? getAvailableAmount()
                           : "0"}{" "}
-                        MON
+                        SOL
                       </span>
                     </div>
                   </div>

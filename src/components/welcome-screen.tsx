@@ -6,9 +6,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useChessBetting } from "@/hooks/useChessBetting";
+import { useSolanaBetting } from "@/hooks/useSolanaBetting";
 import { useState } from "react";
-import { useAccount, useSwitchChain } from "wagmi";
+import { useWallet } from "@solana/wallet-adapter-react";
 
 interface WelcomeScreenProps {
   multisynqReady: boolean;
@@ -22,16 +22,15 @@ export function WelcomeScreen({
   handleCreateRoom,
 }: WelcomeScreenProps) {
   const { isPending, isConfirming, isSuccess, balanceFormatted } =
-    useChessBetting();
-  const { isConnected, chainId } = useAccount();
-  const isWrongNetwork = chainId !== 10143;
-  const { switchChain } = useSwitchChain();
+    useSolanaBetting();
+  const { connected: isConnected } = useWallet();
   const [menuActive, setMenuActive] = useState("create");
   const [selectedGameTime, setSelectedGameTime] = useState(180);
   const [isBettingEnabled, setIsBettingEnabled] = useState(false);
   const [betAmount, setBetAmount] = useState("1");
   const [roomInput, setRoomInput] = useState("");
   const [isCreatingRoom] = useState(false);
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#161616] to-[#191919] bg-center bg-cover flex items-center justify-center p-4">
       <div className="max-w-[700px] w-full bg-[#1E1E1E] backdrop-blur-md rounded-2xl p-[50px] border border-white/5">
@@ -164,7 +163,7 @@ export function WelcomeScreen({
                         {balanceFormatted?.split(".")?.[0] +
                           "." +
                           balanceFormatted?.split(".")?.[1]?.slice(0, 2)}{" "}
-                        MON
+                        SOL
                         {(isPending || isConfirming) && (
                           <span className="ml-2 text-yellow-400">
                             {isPending ? "Signing..." : "Confirming..."}
@@ -179,14 +178,10 @@ export function WelcomeScreen({
 
                   <button
                     onClick={handleCreateRoom}
-                    disabled={
-                      isCreatingRoom || !multisynqReady || isWrongNetwork
-                    }
+                    disabled={isCreatingRoom || !multisynqReady}
                     className="w-full bg-gradient-to-r from-[#836EF9] to-[#836EF9]/80 hover:from-[#836EF9]/80 hover:to-[#836EF9] disabled:from-[rgba(255,255,255,0.07)] disabled:to-[rgba(255,255,255,0.07)] text-white font-medium py-4 px-6 rounded-xl text-lg transition-all"
                   >
-                    {isWrongNetwork
-                      ? "Switch to Monad & Create"
-                      : isCreatingRoom
+                    {isCreatingRoom
                       ? "Creating..."
                       : !multisynqReady
                       ? "Loading Multisynq..."
@@ -210,48 +205,15 @@ export function WelcomeScreen({
                   />
                   <button
                     onClick={handleJoinRoom}
-                    disabled={
-                      !roomInput.trim() ||
-                      !multisynqReady ||
-                      isPending ||
-                      isWrongNetwork
-                    }
+                    disabled={!roomInput.trim() || !multisynqReady || isPending}
                     className="w-full bg-gradient-to-r from-[#836EF9] to-[#836EF9]/80 hover:from-[#836EF9]/80 hover:to-[#836EF9] disabled:from-[rgba(255,255,255,0.07)] disabled:to-[rgba(255,255,255,0.07)] text-white font-medium py-4 px-6 rounded-xl text-lg transition-all"
                   >
-                    {isWrongNetwork
-                      ? "Switch to Monad & Join"
-                      : isPending
-                      ? "Processing..."
-                      : "Join Game"}
+                    {isPending ? "Processing..." : "Join Game"}
                   </button>
                 </div>
               </div>
             )}
           </>
-        )}
-
-        {isConnected && isWrongNetwork && (
-          <div className="mt-8 bg-red-500/20 border border-red-400 rounded-xl p-6">
-            <div className="text-center">
-              <h3 className="text-red-300 font-medium text-xl mb-3">
-                Wrong Network Detected
-              </h3>
-              <p className="text-red-200 text-lg mb-4">
-                Please switch to <strong>Monad Testnet</strong> to use betting
-                features
-              </p>
-              <button
-                onClick={async () => {
-                  try {
-                    await switchChain({ chainId: 10143 });
-                  } catch {}
-                }}
-                className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium text-lg transition-colors"
-              >
-                Switch to Monad Testnet
-              </button>
-            </div>
-          </div>
         )}
       </div>
     </div>

@@ -1,72 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createPublicClient, http } from "viem";
+import { PublicKey, Connection, clusterApiUrl, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { GameState, GameResult } from "@/lib/solana/config";
 
-const CHESS_BETTING_CONTRACT_ADDRESS =
-  "0xC17f273ff1E0aeb058e1c512d968c70CaAfa1Fd1";
+// Connection to Solana devnet
+const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
 
-const monadTestnet = {
-  id: 10143,
-  name: "Monad Testnet",
-  network: "Monad Testnet",
-  nativeCurrency: {
-    decimals: 18,
-    name: "TMON",
-    symbol: "TMON",
-  },
-  rpcUrls: {
-    default: {
-      http: [
-        "https://testnet-rpc2.monad.xyz/52227f026fa8fac9e2014c58fbf5643369b3bfc6",
-        "https://testnet-rpc.monad.xyz/",
-        "https://cold-alien-pine.monad-testnet.quiknode.pro/bd2bdf09752a1d1519c98a1b8baa6467eaa50cb8/",
-        "https://monad-testnet.drpc.org/",
-      ],
-    },
-    public: {
-      http: [
-        "https://testnet-rpc2.monad.xyz/52227f026fa8fac9e2014c58fbf5643369b3bfc6",
-        "https://testnet-rpc.monad.xyz/",
-        "https://cold-alien-pine.monad-testnet.quiknode.pro/bd2bdf09752a1d1519c98a1b8baa6467eaa50cb8/",
-        "https://monad-testnet.drpc.org/",
-      ],
-    },
-  },
-  blockExplorers: {
-    default: {
-      name: "MonadScan",
-      url: "https://scan.monad.com",
-    },
-  },
-};
+// Game account data structure (matches Solana program)
+interface GameAccountData {
+  gameId: string;
+  whitePlayer: string;
+  blackPlayer: string | null;
+  betAmount: number;
+  state: number;
+  result: number;
+  createdAt: number;
+  finishedAt: number;
+  roomName: string;
+  whiteClaimed: boolean;
+  blackClaimed: boolean;
+}
 
-const CHESS_BETTING_ABI = [
-  {
-    inputs: [{ name: "gameId", type: "uint256" }],
-    name: "getGame",
-    outputs: [
-      {
-        components: [
-          { name: "gameId", type: "uint256" },
-          { name: "whitePlayer", type: "address" },
-          { name: "blackPlayer", type: "address" },
-          { name: "betAmount", type: "uint256" },
-          { name: "state", type: "uint8" },
-          { name: "result", type: "uint8" },
-          { name: "createdAt", type: "uint256" },
-          { name: "finishedAt", type: "uint256" },
-          { name: "roomName", type: "string" },
-          { name: "whiteClaimed", type: "bool" },
-          { name: "blackClaimed", type: "bool" },
-          { name: "feePaid", type: "bool" },
-        ],
-        name: "",
-        type: "tuple",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-] as const;
+// Parse game account data from buffer
+// This is a placeholder - implement actual parsing based on your Solana program's schema
+function parseGameAccountData(data: Buffer): GameAccountData | null {
+  try {
+    // In production, parse according to your Anchor/program schema
+    // For now, return placeholder data
+    return null;
+  } catch {
+    return null;
+  }
+}
 
 export const GET = async (request: NextRequest) => {
   try {
@@ -80,21 +44,66 @@ export const GET = async (request: NextRequest) => {
       );
     }
 
-    const gameId = BigInt(gameIdParam);
+    // Parse as PublicKey
+    let gamePubkey: PublicKey;
+    try {
+      gamePubkey = new PublicKey(gameIdParam);
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid game ID format. Must be a valid Solana public key." },
+        { status: 400 }
+      );
+    }
 
-    const publicClient = createPublicClient({
-      chain: monadTestnet,
-      transport: http(),
+    // Fetch account info
+    const accountInfo = await connection.getAccountInfo(gamePubkey);
+
+    if (!accountInfo) {
+      return NextResponse.json(
+        { error: "Game account not found" },
+        { status: 404 }
+      );
+    }
+
+    // Parse account data
+    const gameData = parseGameAccountData(accountInfo.data);
+
+    if (!gameData) {
+      // Return basic account info if parsing fails
+      return NextResponse.json({
+        gameInfo: {
+          gameId: gamePubkey.toBase58(),
+          exists: true,
+          balance: accountInfo.lamports / LAMPORTS_PER_SOL,
+          dataLength: accountInfo.data.length,
+          owner: accountInfo.owner.toBase58(),
+          note: "Full game data parsing pending program deployment",
+        },
+      });
+    }
+
+    // Return parsed game info
+    return NextResponse.json({
+      gameInfo: {
+        ...gameData,
+        stateText:
+          gameData.state === GameState.WAITING
+            ? "WAITING"
+            : gameData.state === GameState.ACTIVE
+            ? "ACTIVE"
+            : gameData.state === GameState.FINISHED
+            ? "FINISHED"
+            : "CANCELLED",
+        resultText:
+          gameData.result === GameResult.NONE
+            ? "NONE"
+            : gameData.result === GameResult.WHITE_WINS
+            ? "WHITE_WINS"
+            : gameData.result === GameResult.BLACK_WINS
+            ? "BLACK_WINS"
+            : "DRAW",
+      },
     });
-
-    const gameInfo = await publicClient.readContract({
-      address: CHESS_BETTING_CONTRACT_ADDRESS,
-      abi: CHESS_BETTING_ABI,
-      functionName: "getGame",
-      args: [gameId],
-    });
-
-    return NextResponse.json({ gameInfo });
   } catch (error) {
     console.error("Error fetching game info:", error);
     return NextResponse.json(

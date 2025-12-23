@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Chess } from "chess.js";
 import { useEffect, useMemo, useState } from "react";
-import { useAccount } from "wagmi";
+import { useWallet, useConnection } from "@solana/wallet-adapter-react";
+import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 
 import { useAudio } from "./useAudio";
 import { useBettingGame } from "./useBettingGame";
@@ -16,13 +17,10 @@ import { useRoomManagement } from "./useRoomManagement";
 import { useTimer } from "./useTimer";
 
 import {
-  useCanCancelGame,
   useChessBetting,
-  useCompleteGameInfo,
-  useContractEvents,
   useGameIdByRoom,
 } from "@/hooks/useChessBetting";
-import { formatEther } from "viem";
+import { formatSOL } from "@/lib/solana/config";
 import { useContractIntegration } from "./useContractInteraction";
 import { useMultisynq } from "./useMultiSynq";
 
@@ -84,7 +82,9 @@ export const useChessMain = () => {
   const [menuActive, setMenuActive] = useState("create");
   const [copied, setCopied] = useState(false);
 
-  const { address, isConnected, chainId } = useAccount();
+  const { publicKey, connected: isConnected } = useWallet();
+  const { connection } = useConnection();
+  const address = publicKey?.toBase58();
 
   const {
     createBettingGame,
@@ -103,10 +103,27 @@ export const useChessMain = () => {
   } = useChessBetting();
 
   const { gameId } = useGameIdByRoom(gameState.roomName);
-  const { gameInfo, refetchAll } = useCompleteGameInfo(gameId);
-  const { canCancel } = useCanCancelGame(gameId);
 
-  useContractEvents(gameId);
+  // Simplified gameInfo for Solana - uses the new hooks
+  const [gameInfo, setGameInfo] = useState<any>(null);
+  const [canCancel, setCanCancel] = useState(false);
+
+  const refetchAll = async () => {
+    // Refetch game info from Solana
+    if (gameId) {
+      try {
+        const response = await fetch(`/api/get-game-info?gameId=${gameId.toBase58()}`);
+        const data = await response.json();
+        if (data.gameInfo) {
+          setGameInfo(data.gameInfo);
+          // Can cancel if game is in WAITING state and user is the creator
+          setCanCancel(data.gameInfo.state === 0 && data.gameInfo.whitePlayer?.toLowerCase() === address?.toLowerCase());
+        }
+      } catch (err) {
+        console.error("Error fetching game info:", err);
+      }
+    }
+  };
 
   const {
     betAmount,
@@ -184,7 +201,6 @@ export const useChessMain = () => {
     setRoomInput,
     isCreatingRoom,
     isCreatingRematch,
-    isWrongNetwork,
     handleCreateRoom,
     handleJoinRoom,
     handleAutoJoinRoom,
@@ -1580,8 +1596,8 @@ export const useChessMain = () => {
   ]);
 
   useEffect(() => {
-    if (gameInfo?.betAmount && gameInfo.betAmount > BigInt(0)) {
-      const currentBetAmount = formatEther(gameInfo.betAmount);
+    if (gameInfo?.betAmount && gameInfo.betAmount > 0) {
+      const currentBetAmount = formatSOL(gameInfo.betAmount);
       if (currentBetAmount !== betAmount) {
         setBetAmount(currentBetAmount);
       }
@@ -1683,7 +1699,6 @@ export const useChessMain = () => {
     isCreatingRoom,
     handleCreateRoom,
     handleJoinRoom,
-    isWrongNetwork,
     multisynqReady,
     handleAutoJoinRoom,
 
@@ -1762,6 +1777,5 @@ export const useChessMain = () => {
     // Account
     address,
     isConnected,
-    chainId,
   };
 };
