@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import { useState } from "react";
-import { useAccount, useSwitchChain } from "wagmi";
+import { useWallet } from "@solana/wallet-adapter-react";
 
 export const useRoomManagement = (
   multisynqReady: boolean,
@@ -25,22 +25,11 @@ export const useRoomManagement = (
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
   const [isCreatingRematch, setIsCreatingRematch] = useState(false);
 
-  const { address, isConnected, chainId } = useAccount();
-  const { switchChain } = useSwitchChain();
-  const isWrongNetwork = chainId !== 10143;
+  const { publicKey, connected: isConnected } = useWallet();
+  const address = publicKey?.toBase58();
 
   const handleCreateRoom = async () => {
     if (!isConnected || !address || !multisynqReady) return;
-
-    if (isWrongNetwork) {
-      try {
-        await switchChain({ chainId: 10143 });
-        setTimeout(() => handleCreateRoom(), 2000);
-        return;
-      } catch {
-        return;
-      }
-    }
 
     setIsCreatingRoom(true);
     setConnectionStatus("Creating room...");
@@ -118,16 +107,6 @@ export const useRoomManagement = (
   const handleJoinRoom = async () => {
     if (!isConnected || !roomInput.trim() || !address || !multisynqReady)
       return;
-
-    if (isWrongNetwork) {
-      try {
-        await switchChain({ chainId: 10143 });
-        setTimeout(() => handleJoinRoom(), 1000);
-        return;
-      } catch {
-        return;
-      }
-    }
 
     const input = roomInput.trim();
     let roomName: string;
@@ -233,7 +212,6 @@ export const useRoomManagement = (
     setIsCreatingRoom,
     isCreatingRematch,
     setIsCreatingRematch,
-    isWrongNetwork,
     handleCreateRoom,
     handleJoinRoom,
     handleAutoJoinRoom,

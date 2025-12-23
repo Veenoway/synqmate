@@ -5,10 +5,11 @@ import {
   QueueStatus,
 } from "@/types/matchmaking";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useAccount } from "wagmi";
+import { useWallet } from "@solana/wallet-adapter-react";
 
 export const useMatchmaking = () => {
-  const { address } = useAccount();
+  const { publicKey } = useWallet();
+  const address = publicKey?.toBase58();
   const [status, setStatus] = useState<MatchmakingStatus>("idle");
   const [queueStatus, setQueueStatus] = useState<QueueStatus>({
     inQueue: false,

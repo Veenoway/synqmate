@@ -1,9 +1,8 @@
 import { Header } from "@/layouts/header";
-import ContextProvider from "@/lib/wagmi/provider";
+import { SolanaProvider } from "@/lib/solana/provider";
 import { Analytics } from "@vercel/analytics/next";
 import type { Metadata } from "next";
 import { Unbounded } from "next/font/google";
-import { headers } from "next/headers";
 import "./globals.css";
 
 const poppins = Unbounded({
@@ -13,23 +12,22 @@ const poppins = Unbounded({
 
 export const metadata: Metadata = {
   title: "Chess Room | Play Chess On Chain",
-  description: "Play Chess Online with your friends.",
+  description: "Play Chess Online with your friends on Solana.",
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const cookies = (await headers()).get("cookie");
   return (
     <html lang="en-US">
       <body className={poppins.className}>
-        <ContextProvider cookies={cookies}>
+        <SolanaProvider>
           <Header />
           {children}
           <Analytics />
-        </ContextProvider>
+        </SolanaProvider>
       </body>
     </html>
   );
