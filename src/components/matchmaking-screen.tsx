@@ -8,7 +8,7 @@ import {
 import { useMatchmaking } from "@/hooks/chess/useMatchmaking";
 import { MatchFound, MatchmakingCriteria } from "@/types/matchmaking";
 import { useEffect, useState } from "react";
-import { useAccount } from "wagmi";
+import { useWallet } from "@solana/wallet-adapter-react";
 
 interface MatchmakingScreenProps {
   onMatchFound: (match: MatchFound) => void;
@@ -19,7 +19,8 @@ export function MatchmakingScreen({ onMatchFound }: MatchmakingScreenProps) {
   const [betAmount, setBetAmount] = useState("1");
   const [isBettingEnabled, setIsBettingEnabled] = useState(true);
 
-  const { address } = useAccount();
+  const { publicKey } = useWallet();
+  const address = publicKey?.toBase58();
 
   const {
     status,
@@ -148,7 +149,7 @@ export function MatchmakingScreen({ onMatchFound }: MatchmakingScreenProps) {
                 <div className="flex justify-between items-center mb-2 text-sm md:text-base">
                   <span className="text-white/80 font-light">Bet:</span>
                   <span className="text-white">
-                    {matchFound?.betAmount} MON
+                    {matchFound?.betAmount} SOL
                   </span>
                 </div>
               )}
@@ -306,7 +307,7 @@ export function MatchmakingScreen({ onMatchFound }: MatchmakingScreenProps) {
                 {isBettingEnabled && (
                   <div>
                     <label className="block text-sm md:text-base text-left font-light text-white/80 mb-2">
-                      Bet amount (MON)
+                      Bet amount (SOL)
                     </label>
                     <input
                       type="text"

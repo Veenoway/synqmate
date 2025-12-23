@@ -2,84 +2,65 @@
 
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
-import { useAccount, useDisconnect, useSwitchChain } from "wagmi";
-import { WalletModal } from "./connect-modal";
+import { useWallet, useConnection } from "@solana/wallet-adapter-react";
+import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 
 export function WalletConnection({ className }: { className?: string }) {
-  // const { open } = useAppKit();
-  const [open, setOpen] = useState(false);
-  const { address, isConnecting, chainId } = useAccount();
-  const { disconnect } = useDisconnect();
-  const { switchChainAsync } = useSwitchChain();
+  const { publicKey, disconnect, connecting, connected } = useWallet();
+  const { setVisible } = useWalletModal();
+  const { connection } = useConnection();
+  const [balance, setBalance] = useState<number | null>(null);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
 
+  // Fetch balance when wallet is connected
   useEffect(() => {
-    if (address) {
+    if (publicKey && connected) {
       setIsInitialLoading(false);
+      connection.getBalance(publicKey).then((bal) => {
+        setBalance(bal / LAMPORTS_PER_SOL);
+      });
+    } else {
+      setBalance(null);
     }
-  }, [address]);
+  }, [publicKey, connected, connection]);
 
   const getDisplayText = () => {
-    if (isConnecting || isInitialLoading) return "Loading...";
-    return `${address?.slice(0, 6)}...${address?.slice(-4)}`;
+    if (connecting || isInitialLoading) return "Loading...";
+    if (!publicKey) return "Connect Wallet";
+    const address = publicKey.toBase58();
+    return `${address.slice(0, 4)}...${address.slice(-4)}`;
   };
-  const isWrongNetwork = chainId !== 10143;
 
-  const handleSwitchNetwork = async () => {
-    try {
-      await switchChainAsync({
-        chainId: 10143,
-      });
-    } catch (err) {
-      console.error("Failed to switch network:", err);
-    }
+  const handleConnect = () => {
+    setVisible(true);
   };
 
   const handleDisconnect = async () => {
-    console.log("disconnecting");
     try {
-      disconnect();
+      await disconnect();
     } catch (err) {
       console.error("Failed to disconnect:", err);
     }
   };
 
-  if (address && isWrongNetwork) {
-    return (
-      <button
-        onClick={handleSwitchNetwork}
-        className={cn(
-          `bg-[#836EF9]
-          flex items-center rounded-lg uppercase h-[40px] sm:h-[50px] w-fit justify-center border border-borderColor px-2.5 sm:px-6 py-5
-           text-sm sm:text-lg text-white mx-auto font-medium transition-all duration-300 ease-in-out
-          `,
-          className
-        )}
-      >
-        Wrong Network
-      </button>
-    );
-  }
-
   return (
     <div className="">
-      {!address && (
-        <WalletModal open={open} setOpen={setOpen}>
-          <button
-            onClick={() => setOpen(true)}
-            className={cn(
-              `bg-[#836EF9]
+      {!connected && (
+        <button
+          onClick={handleConnect}
+          className={cn(
+            `bg-[#836EF9]
              flex items-center justify-center rounded-lg mx-auto w-fit h-[40px] sm:h-[50px] px-2.5 sm:px-6 py-5
              text-sm sm:text-lg text-white font-medium transition-all duration-300 ease-in-out
-             ${isConnecting ? "" : ""}`,
-              className
-            )}
-          >
-            Connect Wallet
-          </button>
-        </WalletModal>
+             ${connecting ? "" : ""}`,
+            className
+          )}
+        >
+          Connect Wallet
+        </button>
       )}
-      {address && !isWrongNetwork && (
+      {connected && publicKey && (
         <div className="flex items-center gap-4 w-full">
           <button
             onClick={handleDisconnect}
@@ -92,6 +73,11 @@ export function WalletConnection({ className }: { className?: string }) {
             )}
           >
             {getDisplayText()}
+            {balance !== null && (
+              <span className="ml-2 text-xs opacity-80">
+                ({balance.toFixed(2)} SOL)
+              </span>
+            )}
           </button>
         </div>
       )}

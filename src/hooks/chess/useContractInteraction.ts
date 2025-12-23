@@ -1,17 +1,28 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import { useEffect, useState } from "react";
+import { PublicKey } from "@solana/web3.js";
+import { GameState } from "@/lib/solana/config";
+
+// Helper function to normalize wallet addresses for comparison
+const normalizeAddress = (address: string | PublicKey | undefined): string => {
+  if (!address) return "";
+  if (address instanceof PublicKey) {
+    return address.toBase58().toLowerCase();
+  }
+  return address.toLowerCase();
+};
 
 export const useContractIntegration = (
-  gameId: bigint | undefined,
+  gameId: PublicKey | undefined,
   gameInfo: any,
   gameState: any,
   multisynqView: any,
   currentPlayerId: string | null,
-  address: string | undefined,
+  walletAddress: string | undefined,
   refetchAll: () => void,
   isSuccess: boolean,
-  finishBettingGame: (gameId: bigint, result: 1 | 2 | 3) => Promise<void>,
+  finishBettingGame: (gameId: PublicKey, result: 1 | 2 | 3) => Promise<void>,
   setIsFinalizingGame: (finalizing: boolean) => void
 ) => {
   const [lastClaimState, setLastClaimState] = useState<{
@@ -20,7 +31,8 @@ export const useContractIntegration = (
   }>({ whiteClaimed: false, blackClaimed: false });
 
   useEffect(() => {
-    if (!gameInfo || !multisynqView || !currentPlayerId || !address) return;
+    if (!gameInfo || !multisynqView || !currentPlayerId || !walletAddress)
+      return;
 
     const whiteJustClaimed =
       gameInfo.whiteClaimed && !lastClaimState.whiteClaimed;
@@ -31,26 +43,28 @@ export const useContractIntegration = (
       setTimeout(() => {
         if (whiteJustClaimed) {
           const isCurrentPlayer =
-            gameInfo.whitePlayer.toLowerCase() === address?.toLowerCase();
+            normalizeAddress(gameInfo.whitePlayer) ===
+            normalizeAddress(walletAddress);
 
           if (isCurrentPlayer) {
             multisynqView.sendMessage(
               `I just claimed!`,
               currentPlayerId,
-              address
+              walletAddress
             );
           }
         }
 
         if (blackJustClaimed) {
           const isCurrentPlayer =
-            gameInfo.blackPlayer.toLowerCase() === address?.toLowerCase();
+            normalizeAddress(gameInfo.blackPlayer) ===
+            normalizeAddress(walletAddress);
 
           if (isCurrentPlayer) {
             multisynqView.sendMessage(
               `I just claimed!`,
               currentPlayerId,
-              address
+              walletAddress
             );
           }
         }
@@ -76,7 +90,7 @@ export const useContractIntegration = (
     gameInfo?.blackPlayer,
     multisynqView,
     currentPlayerId,
-    address,
+    walletAddress,
     lastClaimState,
   ]);
 
@@ -89,7 +103,7 @@ export const useContractIntegration = (
   }, [isSuccess, gameId, refetchAll]);
 
   const finishGameViaRelayer = async (
-    gameId: bigint,
+    gameId: PublicKey,
     result: 1 | 2 | 3
   ): Promise<boolean> => {
     try {
@@ -99,7 +113,7 @@ export const useContractIntegration = (
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          gameId: gameId.toString(),
+          gameId: gameId.toBase58(),
           result: result,
         }),
       });
@@ -122,11 +136,12 @@ export const useContractIntegration = (
     type: "abandoned" | "draw" | "checkmate" | "stalemate" | "timeout" | null;
     winner?: "white" | "black" | "draw";
   }) => {
-    if (!gameId || !gameInfo?.betAmount || gameInfo.betAmount <= BigInt(0)) {
+    if (!gameId || !gameInfo?.betAmount || gameInfo.betAmount <= 0) {
       return;
     }
 
-    if (gameInfo.state === 2) {
+    // Check if game is already finished
+    if (gameInfo.state === GameState.FINISHED) {
       return;
     }
 
@@ -150,11 +165,11 @@ export const useContractIntegration = (
         }
 
         const isWinnerWhiteInContract =
-          gameInfo?.whitePlayer?.toLowerCase() ===
-          winnerPlayer.wallet.toLowerCase();
+          normalizeAddress(gameInfo?.whitePlayer) ===
+          normalizeAddress(winnerPlayer.wallet);
         const isWinnerBlackInContract =
-          gameInfo?.blackPlayer?.toLowerCase() ===
-          winnerPlayer.wallet.toLowerCase();
+          normalizeAddress(gameInfo?.blackPlayer) ===
+          normalizeAddress(winnerPlayer.wallet);
 
         if (isWinnerWhiteInContract) {
           contractResult = 1;
